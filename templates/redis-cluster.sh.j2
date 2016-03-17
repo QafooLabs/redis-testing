@@ -1,0 +1,5 @@
+#!/bin/bash
+
+{% for port in range(7000, redis_server_end_port+1) %}
+/etc/init.d/redis-server-{{ port }} $1
+{% endfor %}

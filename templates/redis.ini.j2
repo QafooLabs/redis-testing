@@ -1,0 +1,8 @@
+extension=redis.so
+session.save_handler=rediscluster
+session.save_path="seed[]=127.0.0.1:7000&timeout=3&read_timeout=3&failover=error"
+session.save_path="{% for host in groups['all'] %}{% for port in range(7000, redis_server_end_port+1) %}seed[]={{ hostvars[host].ansible_default_ipv4.address }}:{{ port }}&{% endfor %}{% endfor %}&timeout=3&read_timeout=3&failover=error"
+
+redis.clusters.seeds = "{% for host in groups['all'] %}{% for port in range(7000, redis_server_end_port+1) %}mycluster[]={{ hostvars[host].ansible_default_ipv4.address }}:{{ port }}{% if not loop.last %}&{% endif %}{% endfor %}{% if not loop.last %}&{% endif %}{% endfor %}"
+redis.clusters.timeout = "mycluster=5"
+redis.clusters.read_timeout = "mycluster=10"

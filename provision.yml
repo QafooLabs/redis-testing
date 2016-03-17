@@ -1,0 +1,171 @@
+---
+- hosts: all
+  tasks:
+
+      - name: "/etc/hosts"
+        debug: msg="{{ ansible_default_ipv4.address }} {{ ansible_hostname }}.qafoolabs.com"
+
+      - name: "Update all packages and upgrade cache"
+        apt: update_cache=yes upgrade=yes
+
+      - name: "Install tools"
+        apt: pkg={{ item }} state=latest
+        with_items:
+            - git
+            - curl
+            - tree
+            - ruby
+
+      - name: "Install redis gem"
+        gem: name=redis state=latest
+
+- hosts: redis
+  vars:
+      somaxconn: "{{ lookup('file', '/proc/sys/net/core/somaxconn') }}"
+      vmovercommit: "{{ lookup('file', '/proc/sys/vm/overcommit_memory') }}"
+  tasks:
+      - name: "Echo"
+        debug: msg="foo {{ somaxconn }} and {{ vmovercommit }}"
+
+      - name: "sysctl -w net.core.somaxconn=65535"
+        command: sysctl -w net.core.somaxconn=65535
+        when: "{{ somaxconn }} == 128"
+
+      - name: "sysctl -w net.core.somaxconn=65535 in /etc/rc.local"
+        lineinfile: >
+            dest=/etc/rc.local
+            insertbefore=exit
+            regexp=somaxconn
+            line="sysctl -w net.core.somaxconn=65535"
+
+      - name: "vm.overcommit_memory=1"
+        lineinfile:
+          dest=/etc/sysctl.conf
+          regexp="^vm.overcommit_memory"
+          line="vm.overcommit_memory = 1"
+
+      - name: "vm.overcommit_memory now"
+        command: "sysctl vm.overcommit_memory=1"
+        when: "{{ vmovercommit }} == 0"
+
+      - name: "Install chris-lea/redis-server PPA"
+        tags: ['redis']
+        apt_repository: repo='ppa:chris-lea/redis-server' state=present
+
+      - name: "Install redis-server"
+        tags: ['redis']
+        apt: pkg=redis-server state=latest
+
+      - name: "Spread /etc/init.d/redis-server for multi-spawning instances"
+        tags: ['redis']
+        template: >
+          src=redis.init.j2
+          dest=/etc/init.d/redis-server-{{ item }}
+          mode=0755
+        with_sequence: start=7000 end={{ redis_server_end_port }}
+
+      - name: "Multiple Redis Datadirs"
+        tags: ['redis']
+        file: path=/var/lib/redis/{{ item }} state=directory owner=redis group=redis
+        with_sequence: start=7000 end={{ redis_server_end_port }}
+
+      - name: "Create redis-server config files"
+        tags: ['redis']
+        template: >
+            src=server.conf.j2
+            dest=/etc/redis/redis-{{ item }}.conf
+        with_sequence: start=7000 end={{ redis_server_end_port }}
+
+      - name: "Update redis.conf"
+        tags: ['redis']
+        template: src=redis.conf.j2 dest=/etc/redis/redis.conf
+
+      - name: "Update cluster.conf"
+        tags: ['redis']
+        template: src=cluster.conf.j2 dest=/etc/redis/cluster.conf
+
+      - name: "create-cluster.sh"
+        tags: ['redis']
+        template: src=create-cluster.sh.j2 dest=/root/create-cluster.sh mode=0755
+
+      - name: "redis-cluster.sh"
+        tags: ['redis']
+        template: src=redis-cluster.sh.j2 dest=/root/redis-cluster.sh mode=0755
+
+- hosts: php
+  tasks:
+      - name: "Add ondrej/php as apt-repository"
+        apt_repository: repo='ppa:ondrej/php' state=present
+
+      - name: "Install PHP+FPM"
+        apt: pkg={{ item }}
+        with_items:
+            - php5.6
+            - php5.6-fpm
+            - php5.6-dev
+
+      - name: "install phpredis Extension"
+        get_url: >
+            url=https://github.com/phpredis/phpredis/archive/develop.tar.gz
+            dest=/root/phpredis-develop.tar.gz
+
+      - name: "configure phpredis extension"
+        template: >
+            src=redis.ini.j2
+            dest=/etc/php/5.6/mods-available/redis.ini
+        notify: "Restart PHP-FPM"
+
+      - name: "enable redis"
+        command: >
+            phpenmod redis
+            creates=/etc/php/5.6/fpm/conf.d/20-redis.ini
+        notify: "Restart PHP-FPM"
+
+      - name: "Unarchive phpredis extension"
+        unarchive: >
+            copy=no
+            src=/root/phpredis-develop.tar.gz
+            dest=/root
+
+      - name: "Build phpredis extension"
+        shell: >
+            phpize && ./configure && make && make install
+            chdir=/root/phpredis-develop
+
+      - name: "/var/www"
+        file: path=/var/www state=directory
+
+      - name: "Nginx"
+        apt: pkg=nginx
+
+      - name: "Remove default site"
+        file: path=/etc/nginx/sites-enabled/default state=absent
+        notify: "Restart Nginx"
+
+      - name: "Nginx Host"
+        template: src=nginx_host dest=/etc/nginx/sites-enabled/www
+        notify: "Restart Nginx"
+
+      - name: "Upload code"
+        tags: ['upload']
+        synchronize: src=www/ dest=/var/www
+
+      - name: "Change access"
+        tags: ['upload']
+        file: path=/var/www/ owner=www-data group=www-data recurse=yes
+
+      - name: "Build hosts file"
+        lineinfile: dest=/etc/hosts regexp='.*{{ item }}$' line="{{ hostvars[item].ansible_default_ipv4.address }} {{item}}.qafoolabs.com" state=present
+        tags: ['hosts']
+        when: hostvars[item].ansible_default_ipv4.address is defined
+        with_items: groups['all']
+
+  handlers:
+      - name: "Restart Redis"
+        service: name=redis-server state=restarted
+
+      - name: "Restart Nginx"
+        service: name=nginx state=restarted
+
+      - name: "Restart PHP-FPM"
+        service: name=php5.6-fpm state=restarted

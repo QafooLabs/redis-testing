@@ -1,0 +1,7 @@
+port {{ item }}
+bind {{ ansible_default_ipv4.address }}
+pidfile /var/run/redis/redis-server-{{ item }}.pid
+dir /var/lib/redis/{{ item }}
+logfile /var/log/redis/server-{{ item }}.log
+cluster-config-file nodes-{{ item }}.conf
+include /etc/redis/redis.conf

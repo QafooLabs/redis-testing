@@ -1,0 +1,7 @@
+---
+- hosts: all
+  tasks:
+      - name: "Drop all traffic from [partition_b] machines to"
+        iptables: chain=INPUT source={{ hostvars[item].ansible_default_ipv4.address }} jump=DROP
+        when: "'partition_b' in group_names"
+        with_items: "{{ groups['partition_a'] }}"
