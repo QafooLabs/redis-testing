@@ -1,0 +1,10 @@
+<html>
+    <body>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.0.0-beta1/jquery.js" language="javascript" type="text/javascript"></script>
+        <script language="javascript">
+            for (var i = 0; i < 5; i++) {
+                $.ajax({"url": "session_block.php?i=" + i});
+            }
+        </script>
+    </body>
+</html>
