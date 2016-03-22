@@ -154,6 +154,10 @@
         tags: ['upload']
         file: path=/var/www/ owner=www-data group=www-data recurse=yes
 
+      - name: "Nodes configuration"
+        tags: ['upload']
+        template: src=nodes.php.j2 dest=/var/www/nodes.php owner=www-data group=www-data
+
       - name: "Build hosts file"
         lineinfile: dest=/etc/hosts regexp='.*{{ item }}$' line="{{ hostvars[item].ansible_default_ipv4.address }} {{item}}.qafoolabs.com" state=present
         tags: ['hosts']

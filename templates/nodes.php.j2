@@ -1,0 +1,11 @@
+<?php
+
+return [
+{% for host in groups['redis'] %}
+    {% if hostvars[host].ansible_default_ipv4.address is defined %}
+        {% for port in range(7000, redis_server_end_port+1) %}
+        {{ hostvars[host].ansible_default_ipv4.address }}:{{ port }}",
+        {% endfor %}
+    {% endif %}
+{% endfor %}
+];

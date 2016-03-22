@@ -1,12 +1,5 @@
 <?php
-$nodes = array (
-  0 => '46.101.104.112:7000',
-  1 => '46.101.104.112:7001',
-  2 => '46.101.104.112:7002',
-  3 => '46.101.111.180:7000',
-  4 => '46.101.111.180:7001',
-  5 => '46.101.111.180:7002',
-);
+$nodes = include "/var/www/nodes.php";
 shuffle($nodes);
 $save_path = ['seed' => $nodes, 'read_timeout' => 0.5, 'timeout' => 0.5, 'failover' => 'error'];
 

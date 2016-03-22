@@ -1,17 +1,10 @@
 <?php
 
-$start = microtime(true);
-$nodes = array (
-  0 => '46.101.104.112:7000',
-  1 => '46.101.104.112:7001',
-  2 => '46.101.104.112:7002',
-  3 => '46.101.111.180:7000',
-  4 => '46.101.111.180:7001',
-  5 => '46.101.111.180:7002',
-);
+$nodes = include "/var/www/nodes.php";
+
 shuffle($nodes);
+
 $cluster = new RedisCluster(null, $nodes, 0.5, 0.5);
-echo (microtime(true) - $start). "<br />";
 
 $userId = isset($_GET['userId']) ? (int)$_GET['userId'] : rand(0, 16384);
 $userId = "user" . $userId;
